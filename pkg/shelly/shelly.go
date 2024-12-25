@@ -3,6 +3,7 @@ package shelly
 import (
 	"encoding/json"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -51,6 +52,10 @@ func (s ShellyTime) Format(ts string) string {
 	return time.Time(s).Format(DateTimeFmt)
 }
 
+func (s ShellyTime) Before(t ShellyTime) bool {
+	return time.Time(s).Before(time.Time(t))
+}
+
 func combineEntries(entryA, entryB *Entry) *Entry {
 	tariff := "multiple"
 	if entryA.TariffID == entryB.TariffID {
@@ -79,8 +84,8 @@ func combineEntries(entryA, entryB *Entry) *Entry {
 }
 
 func NormalizePowerConsumptionStatistics(stats *PowerConsumptionStatistics, from, to time.Time) *PowerConsumptionStatistics {
+	// Parse the existing data and normalize it by combining duplicate date/time entries.
 	normalized := map[time.Time]map[string]*Entry{}
-
 	date := from
 	for date.Before(to) {
 		for i := 0; i < len(stats.Sum); i++ {
@@ -134,6 +139,7 @@ func NormalizePowerConsumptionStatistics(stats *PowerConsumptionStatistics, from
 		date = date.AddDate(0, 0, 1)
 	}
 
+	// Create the new structure and add the normalized data.
 	out := &PowerConsumptionStatistics{
 		Timezone: stats.Timezone,
 		Interval: stats.Interval,
@@ -144,13 +150,26 @@ func NormalizePowerConsumptionStatistics(stats *PowerConsumptionStatistics, from
 		},
 		Sum: []*Entry{},
 	}
-
 	for _, entries := range normalized {
 		out.History[0] = append(out.History[0], entries["phaseA"])
 		out.History[1] = append(out.History[1], entries["phaseB"])
 		out.History[2] = append(out.History[2], entries["phaseC"])
 		out.Sum = append(out.Sum, entries["total"])
 	}
+
+	// Finally sort all slices by date/time
+	sort.Slice(out.History[0], func(i, j int) bool {
+		return out.History[0][i].DateTime.Before(out.History[0][j].DateTime)
+	})
+	sort.Slice(out.History[1], func(i, j int) bool {
+		return out.History[1][i].DateTime.Before(out.History[1][j].DateTime)
+	})
+	sort.Slice(out.History[2], func(i, j int) bool {
+		return out.History[2][i].DateTime.Before(out.History[2][j].DateTime)
+	})
+	sort.Slice(out.Sum, func(i, j int) bool {
+		return out.Sum[i].DateTime.Before(out.Sum[j].DateTime)
+	})
 
 	return out
 }

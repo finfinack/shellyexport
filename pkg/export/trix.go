@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/finfinack/shellyExport/pkg/config"
 	"github.com/finfinack/shellyExport/pkg/shelly"
@@ -14,8 +15,8 @@ import (
 )
 
 const (
-	valueInputOption = "USER_ENTERED" // https://developers.google.com/sheets/api/reference/rest/v4/ValueInputOption
-	insertDataOption = "INSERT_ROWS"  // https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append#InsertDataOption
+	valueInputOptionUserEntered = "USER_ENTERED" // https://developers.google.com/sheets/api/reference/rest/v4/ValueInputOption
+	insertDataOptionInsertRows  = "INSERT_ROWS"  // https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append#InsertDataOption
 )
 
 func ToGoogleSheet(ctx context.Context, stats *shelly.PowerConsumptionStatistics, cfg *config.GoogleSheet) error {
@@ -35,11 +36,11 @@ func ToGoogleSheet(ctx context.Context, stats *shelly.PowerConsumptionStatistics
 		return fmt.Errorf("unable to create new service: %s", err)
 	}
 
-	// TODO: Check if header needs to be written.
+	// Overwrite headers
 	values := &sheets.ValueRange{
 		Values: [][]interface{}{
 			{
-				"day",
+				"date",
 				"phase_a",
 				"phase_b",
 				"phase_c",
@@ -52,10 +53,47 @@ func ToGoogleSheet(ctx context.Context, stats *shelly.PowerConsumptionStatistics
 			},
 		},
 	}
-	// TODO:
-	// - check which days already exist and overwrite if necessary (instead of appending)
-	// - write date as date without empty time
-	// - skip / overwrite missing values at the end in particular
+	hdrResp, err := svc.Spreadsheets.Values.Update(cfg.SpreadsheetID, fmt.Sprintf("%s!A1:J1", cfg.SheetID), values).ValueInputOption(valueInputOptionUserEntered).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("unable to update header values: %s", err)
+	}
+	if hdrResp.HTTPStatusCode != 200 {
+		return fmt.Errorf("unable to update header values: HTTP code %d", hdrResp.HTTPStatusCode)
+	}
+
+	// Figure out whether there is overlap.
+	firstDate := time.Time(stats.Sum[0].DateTime)
+	getResp, err := svc.Spreadsheets.Values.Get(cfg.SpreadsheetID, fmt.Sprintf("%s!A:A", cfg.SheetID)).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("unable to update header values: %s", err)
+	}
+	if hdrResp.HTTPStatusCode != 200 {
+		return fmt.Errorf("unable to update header values: HTTP code %d", hdrResp.HTTPStatusCode)
+	}
+	rowIdx := 1
+	for _, row := range getResp.Values {
+		if rowIdx == 1 {
+			rowIdx += 1
+			continue // skip header
+		}
+		if row[0].(string) == "" {
+			break
+		}
+		rowDate, err := time.Parse(time.DateTime, row[0].(string))
+		if err != nil {
+			rowDate, err = time.Parse(dayFmt, row[0].(string))
+			if err != nil {
+				return fmt.Errorf("unable to parse row as date/time: %s", row[0])
+			}
+		}
+		if rowDate.Before(firstDate) {
+			rowIdx += 1
+			continue
+		}
+		break
+	}
+
+	values = &sheets.ValueRange{Values: [][]interface{}{}}
 	for i := 0; i < len(stats.Sum); i++ {
 		values.Values = append(values.Values, []interface{}{
 			stats.Sum[i].DateTime.Format(dayFmt),
@@ -71,9 +109,12 @@ func ToGoogleSheet(ctx context.Context, stats *shelly.PowerConsumptionStatistics
 		})
 	}
 
-	resp, err := svc.Spreadsheets.Values.Append(cfg.SpreadsheetID, cfg.SheetID, values).ValueInputOption(valueInputOption).InsertDataOption(insertDataOption).Context(ctx).Do()
-	if err != nil || resp.HTTPStatusCode != 200 {
-		return err
+	upResp, err := svc.Spreadsheets.Values.Update(cfg.SpreadsheetID, fmt.Sprintf("%s!A%d:J%d", cfg.SheetID, rowIdx, rowIdx+len(stats.Sum)), values).ValueInputOption(valueInputOptionUserEntered).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("unable to update values: %s", err)
+	}
+	if upResp.HTTPStatusCode != 200 {
+		return fmt.Errorf("unable to update values: HTTP code %d", upResp.HTTPStatusCode)
 	}
 
 	return nil

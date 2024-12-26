@@ -83,7 +83,7 @@ func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsum
 	var stats *shelly.PowerConsumptionStatistics
 
 	from := time.Time(cfg.Timeframe.From)
-	to := time.Time(cfg.Timeframe.From).AddDate(0, 1, 0)
+	to := time.Time(from).AddDate(0, 1, 0)
 	for {
 		if !to.Before(time.Time(cfg.Timeframe.To)) {
 			to = time.Time(cfg.Timeframe.To)
@@ -110,7 +110,7 @@ func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsum
 		}
 
 		from = to
-		to = time.Time(cfg.Timeframe.From).AddDate(0, 1, 0)
+		to = time.Time(from).AddDate(0, 1, 0)
 	}
 
 	return stats, nil

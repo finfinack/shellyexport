@@ -57,8 +57,9 @@ type Timeframe struct {
 }
 
 type Device struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name,omitempty"`
+	GoogleSheet *GoogleSheet `json:"google_sheet"`
 }
 
 type GoogleSheet struct {
@@ -85,12 +86,41 @@ func Validate(config *Config) error {
 		return errors.New("from date needs to be before to date")
 	}
 
-	// Device
-	if len(config.Devices) != 1 {
-		return errors.New("exactly one device needs to be set")
+	// Google Sheet
+	if config.GoogleSheet != nil {
+		if config.GoogleSheet.SvcAcctKey == "" {
+			return errors.New("svc_acct_key must be set for Google Sheet exports")
+		}
 	}
-	if config.Devices[0].ID == "" {
-		return errors.New("device ID needs to be set")
+
+	// Device
+	if len(config.Devices) == 0 {
+		return errors.New("at least one device needs to be set")
+	}
+	for i, dev := range config.Devices {
+		if dev.ID == "" {
+			return fmt.Errorf("device ID needs to be set for device %d", i)
+		}
+		if dev.GoogleSheet != nil {
+			if dev.GoogleSheet.SheetID == "" && config.GoogleSheet != nil {
+				dev.GoogleSheet.SheetID = config.GoogleSheet.SheetID
+			}
+			if dev.GoogleSheet.SheetID == "" {
+				return fmt.Errorf("sheet_id must be set for device %d (or globally)", i)
+			}
+			if dev.GoogleSheet.SpreadsheetID == "" && config.GoogleSheet != nil {
+				dev.GoogleSheet.SpreadsheetID = config.GoogleSheet.SpreadsheetID
+			}
+			if dev.GoogleSheet.SpreadsheetID == "" {
+				return fmt.Errorf("spreadsheet_id must be set for device %d (or globally)", i)
+			}
+			if dev.GoogleSheet.SvcAcctKey == "" && config.GoogleSheet != nil {
+				dev.GoogleSheet.SvcAcctKey = config.GoogleSheet.SvcAcctKey
+			}
+			if dev.GoogleSheet.SvcAcctKey == "" {
+				return fmt.Errorf("service_account_key must be set for device %d (or globally)", i)
+			}
+		}
 	}
 
 	// Auth
@@ -99,13 +129,6 @@ func Validate(config *Config) error {
 	}
 	if config.AuthKey == "" {
 		return errors.New("auth key needs to be set")
-	}
-
-	// Google Sheet
-	if config.GoogleSheet != nil {
-		if config.GoogleSheet.SheetID == "" || config.GoogleSheet.SpreadsheetID == "" || config.GoogleSheet.SvcAcctKey == "" {
-			return errors.New("all of sheet_id, spreadsheet_id and svc_acct_key must be set for Google Sheet exports")
-		}
 	}
 
 	return nil

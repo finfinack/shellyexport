@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/finfinack/shellyExport/pkg/config"
@@ -19,7 +20,7 @@ import (
 
 var (
 	configFile = flag.String("config", "config.json", "File path where the configuration is stored.")
-	outfile    = flag.String("out", "", "File path where the output is written to.")
+	outfilePfx = flag.String("out", "", "File path used as a prefix for where the output is written to.")
 )
 
 const (
@@ -27,14 +28,14 @@ const (
 	minInterval = 5 * 24 * time.Hour // 5 days
 )
 
-func pullStatisticsForTimeframe(cfg *config.Config, from, to time.Time) (*shelly.PowerConsumptionStatistics, error) {
+func pullStatisticsForTimeframe(cfg *config.Config, dev *config.Device, from, to time.Time) (*shelly.PowerConsumptionStatistics, error) {
 	url, err := url.Parse(cfg.Server)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server specified in config (%q): %s\n", cfg.Server, err)
 	}
 	url.Path = "/v2/statistics/power-consumption/em-3p"
 	q := url.Query()
-	q.Set("id", cfg.Devices[0].ID)
+	q.Set("id", dev.ID)
 	q.Set("channel", "0")
 	q.Set("date_range", "custom")
 	q.Set("date_from", from.Format(shelly.DateTimeFmt))
@@ -42,7 +43,7 @@ func pullStatisticsForTimeframe(cfg *config.Config, from, to time.Time) (*shelly
 	q.Set("auth_key", cfg.AuthKey)
 	url.RawQuery = q.Encode()
 
-	log.Printf("requesting stats from %q to %q\n", from.Format(shelly.DateTimeFmt), to.Format(shelly.DateTimeFmt))
+	log.Printf("requesting stats for device %q (ID %s) from %q to %q\n", dev.Name, dev.ID, from.Format(shelly.DateTimeFmt), to.Format(shelly.DateTimeFmt))
 
 	req, err := http.NewRequest(http.MethodGet, url.String(), nil)
 	if err != nil {
@@ -78,7 +79,7 @@ func pullStatisticsForTimeframe(cfg *config.Config, from, to time.Time) (*shelly
 	return shelly.NormalizePowerConsumptionStatistics(stats, from, to), nil
 }
 
-func pullStatistics(cfg *config.Config) (*shelly.PowerConsumptionStatistics, error) {
+func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsumptionStatistics, error) {
 	var stats *shelly.PowerConsumptionStatistics
 
 	from := time.Time(cfg.Timeframe.From)
@@ -94,7 +95,7 @@ func pullStatistics(cfg *config.Config) (*shelly.PowerConsumptionStatistics, err
 			to = from.Add(minInterval)
 		}
 
-		statsFrame, err := pullStatisticsForTimeframe(cfg, from, to)
+		statsFrame, err := pullStatisticsForTimeframe(cfg, dev, from, to)
 		if err != nil {
 			return nil, fmt.Errorf("unable to pull statistics from %q to %q: %s", from, to, err)
 		}
@@ -115,31 +116,55 @@ func pullStatistics(cfg *config.Config) (*shelly.PowerConsumptionStatistics, err
 	return stats, nil
 }
 
+func run(ctx context.Context, cfg *config.Config, outpfx string) error {
+	for _, dev := range cfg.Devices {
+		stats, err := pullStatistics(cfg, dev)
+		if err != nil {
+			return fmt.Errorf("unable to pull statistics: %s", err)
+		}
+
+		var out io.Writer
+		if dev.GoogleSheet == nil {
+			out = os.Stdout
+		}
+		if outpfx != "" {
+			name := dev.Name
+			if name == "" {
+				name = dev.ID
+			}
+			name = strings.ReplaceAll(strings.ToLower(name), " ", "_")
+			outfile := fmt.Sprintf("%s-dev-%s.csv", outpfx, name)
+			out, err = os.Create(outfile)
+			if err != nil {
+				return fmt.Errorf("unable to open file %q for writing: %s", outfile, err)
+			} else {
+				log.Printf("writing output for device %q (ID %q) to %q\n", dev.Name, dev.ID, outfile)
+			}
+		}
+		if out != nil {
+			export.ToCSV(stats, out)
+		}
+
+		if dev.GoogleSheet != nil {
+			if err := export.ToGoogleSheet(ctx, stats, dev.GoogleSheet); err != nil {
+				return fmt.Errorf("unable to export to sheet: %s", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
+	ctx := context.Background()
 
 	cfg, err := config.ReadFromFile(*configFile)
 	if err != nil {
-		log.Fatalf("unable to read config: %s\n", err)
+		log.Fatalf("unable to read config: %s", err)
 	}
 
-	stats, err := pullStatistics(cfg)
-	if err != nil {
-		log.Fatalf("unable to pull statistics: %s\n", err)
-	}
-
-	out := os.Stdout
-	if *outfile != "" {
-		out, err = os.Create(*outfile)
-		if err != nil {
-			log.Fatalf("unable to open file %q for writing: %s\n", *outfile, err)
-		}
-	}
-	export.ToCSV(stats, out)
-
-	if cfg.GoogleSheet != nil {
-		if err := export.ToGoogleSheet(context.Background(), stats, cfg.GoogleSheet); err != nil {
-			log.Fatalf("unable to export to sheet: %s\n", err)
-		}
+	if err := run(ctx, cfg, *outfilePfx); err != nil {
+		log.Fatal(err)
 	}
 }

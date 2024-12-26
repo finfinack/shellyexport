@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	urlPath     = "/v2/statistics/power-consumption/em-3p"
+	urlPath     = "/v2/statistics/power-consumption"
 	minInterval = 5 * 24 * time.Hour // 5 days
 )
 
@@ -33,7 +33,7 @@ func pullStatisticsForTimeframe(cfg *config.Config, dev *config.Device, from, to
 	if err != nil {
 		return nil, fmt.Errorf("invalid server specified in config (%q): %s\n", cfg.Server, err)
 	}
-	url.Path = "/v2/statistics/power-consumption/em-3p"
+	url = url.JoinPath(url.Path, urlPath, dev.Type)
 	q := url.Query()
 	q.Set("id", dev.ID)
 	q.Set("channel", "0")
@@ -118,6 +118,11 @@ func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsum
 
 func run(ctx context.Context, cfg *config.Config, outpfx string) error {
 	for _, dev := range cfg.Devices {
+		if dev.IsDisabled {
+			log.Printf("skipping device %s (ID %s) because it is disabled\n", dev.Name, dev.ID)
+			continue
+		}
+
 		stats, err := pullStatistics(cfg, dev)
 		if err != nil {
 			return fmt.Errorf("unable to pull statistics: %s", err)

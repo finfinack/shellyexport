@@ -5,12 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 )
 
 const (
 	DateFmt = time.DateOnly
+)
+
+var (
+	supportedDeviceTypes = []string{
+		"em-3p",
+	}
 )
 
 type ConfigDate time.Time
@@ -59,6 +66,8 @@ type Timeframe struct {
 type Device struct {
 	ID          string       `json:"id"`
 	Name        string       `json:"name,omitempty"`
+	Type        string       `json:"type"`
+	IsDisabled  bool         `json:"disabled"`
 	GoogleSheet *GoogleSheet `json:"google_sheet"`
 }
 
@@ -100,6 +109,9 @@ func Validate(config *Config) error {
 	for i, dev := range config.Devices {
 		if dev.ID == "" {
 			return fmt.Errorf("device ID needs to be set for device %d", i)
+		}
+		if !slices.Contains(supportedDeviceTypes, strings.ToLower(dev.Type)) {
+			return fmt.Errorf("device type %q is not supported: %s", dev.Type, supportedDeviceTypes)
 		}
 		if dev.GoogleSheet != nil {
 			if dev.GoogleSheet.SheetID == "" && config.GoogleSheet != nil {

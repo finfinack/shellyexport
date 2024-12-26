@@ -42,11 +42,12 @@ func (d ConfigDate) Before(e ConfigDate) bool {
 }
 
 type Config struct {
-	Timeframe *Timeframe `json:"timeframe"`
-	UserAgent string     `json:"user_agent"`
-	Server    string     `json:"server"`
-	AuthKey   string     `json:"auth_key"`
-	Devices   []*Device  `json:"devices"`
+	Timeframe   *Timeframe   `json:"timeframe"`
+	UserAgent   string       `json:"user_agent"`
+	Server      string       `json:"server"`
+	AuthKey     string       `json:"auth_key"`
+	Devices     []*Device    `json:"devices"`
+	GoogleSheet *GoogleSheet `json:"google_sheet"`
 }
 
 type Timeframe struct {
@@ -58,6 +59,12 @@ type Timeframe struct {
 type Device struct {
 	ID   string `json:"id"`
 	Name string `json:"name,omitempty"`
+}
+
+type GoogleSheet struct {
+	SvcAcctKey    string `json:"service_account_key"`
+	SheetID       string `json:"sheet_id"`
+	SpreadsheetID string `json:"spreadsheet_id"`
 }
 
 func Validate(config *Config) error {
@@ -92,6 +99,13 @@ func Validate(config *Config) error {
 	}
 	if config.AuthKey == "" {
 		return errors.New("auth key needs to be set")
+	}
+
+	// Google Sheet
+	if config.GoogleSheet != nil {
+		if config.GoogleSheet.SheetID == "" || config.GoogleSheet.SpreadsheetID == "" || config.GoogleSheet.SvcAcctKey == "" {
+			return errors.New("all of sheet_id, spreadsheet_id and svc_acct_key must be set for Google Sheet exports")
+		}
 	}
 
 	return nil

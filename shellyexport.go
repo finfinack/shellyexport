@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -135,4 +136,10 @@ func main() {
 		}
 	}
 	export.ToCSV(stats, out)
+
+	if cfg.GoogleSheet != nil {
+		if err := export.ToGoogleSheet(context.Background(), stats, cfg.GoogleSheet); err != nil {
+			log.Fatalf("unable to export to sheet: %s\n", err)
+		}
+	}
 }

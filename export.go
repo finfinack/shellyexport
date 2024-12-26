@@ -16,8 +16,7 @@ import (
 )
 
 var (
-	configFile   = flag.String("config", "config.json", "File path where the configuration is stored.")
-	lookbackDays = flag.Int("lookback", 30, "Number of past days to fetch data for.")
+	configFile = flag.String("config", "config.json", "File path where the configuration is stored.")
 )
 
 const (
@@ -31,12 +30,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to read config: %s\n", err)
 	}
-	if len(cfg.Devices) != 1 {
-		log.Fatalln("config needs to contain exactly one device at the moment")
-	}
-
-	from := time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -*lookbackDays)
-	to := time.Now().UTC().Truncate(24 * time.Hour)
 
 	url, err := url.Parse(cfg.Server)
 	if err != nil {
@@ -47,8 +40,8 @@ func main() {
 	q.Set("id", cfg.Devices[0].ID)
 	q.Set("channel", "0")
 	q.Set("date_range", "custom")
-	q.Set("date_from", from.Format(shelly.DateTimeFmt))
-	q.Set("date_to", to.Format(shelly.DateTimeFmt))
+	q.Set("date_from", cfg.Timeframe.From.Format(shelly.DateTimeFmt))
+	q.Set("date_to", cfg.Timeframe.To.Format(shelly.DateTimeFmt))
 	q.Set("auth_key", cfg.AuthKey)
 	url.RawQuery = q.Encode()
 
@@ -83,6 +76,6 @@ func main() {
 		log.Fatalf("returned interval is not supported: %q\n", stats.Interval)
 	}
 
-	stats = shelly.NormalizePowerConsumptionStatistics(stats, from, to)
+	stats = shelly.NormalizePowerConsumptionStatistics(stats, time.Time(cfg.Timeframe.From), time.Time(cfg.Timeframe.To))
 	export.ToCSV(stats, os.Stdout)
 }

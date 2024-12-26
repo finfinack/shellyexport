@@ -25,6 +25,7 @@ func ToCSV(stats *shelly.PowerConsumptionStatistics, w io.Writer) {
 		"phase_b_returned",
 		"phase_c_returned",
 		"total_returned",
+		"is_missing",
 	})
 
 	for i := 0; i < len(stats.Sum); i++ {
@@ -38,6 +39,7 @@ func ToCSV(stats *shelly.PowerConsumptionStatistics, w io.Writer) {
 			fmt.Sprintf("%f", stats.History[1][i].Reversed),
 			fmt.Sprintf("%f", stats.History[2][i].Reversed),
 			fmt.Sprintf("%f", stats.Sum[i].Reversed),
+			fmt.Sprintf("%t", stats.Sum[i].IsMissing),
 		})
 	}
 	writer.Flush()

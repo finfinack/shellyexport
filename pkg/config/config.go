@@ -37,6 +37,10 @@ func (d ConfigDate) Format(ts string) string {
 	return time.Time(d).Format(DateFmt)
 }
 
+func (d ConfigDate) Before(e ConfigDate) bool {
+	return time.Time(d).Before(time.Time(e))
+}
+
 type Config struct {
 	Timeframe *Timeframe `json:"timeframe"`
 	UserAgent string     `json:"user_agent"`
@@ -64,11 +68,14 @@ func Validate(config *Config) error {
 	if config.Timeframe.LookbackDays == 0 && (config.Timeframe.From.IsZero() || config.Timeframe.To.IsZero()) {
 		return errors.New("either lookback_days or from and to need to be set")
 	}
-	if config.Timeframe.LookbackDays > 0 && (config.Timeframe.From.IsZero() || config.Timeframe.To.IsZero()) {
-		return errors.New("either lookback_days or from and to need to be set")
+	if config.Timeframe.LookbackDays > 0 && (!config.Timeframe.From.IsZero() || !config.Timeframe.To.IsZero()) {
+		return errors.New("when lookbac_days is set, both from and to cannot be set")
 	}
 	if !config.Timeframe.From.IsZero() && config.Timeframe.To.IsZero() {
 		return errors.New("when lookback_days is not set, both from and to need to be set")
+	}
+	if config.Timeframe.To.Before(config.Timeframe.From) {
+		return errors.New("from date needs to be before to date")
 	}
 
 	// Device

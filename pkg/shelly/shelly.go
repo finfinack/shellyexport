@@ -2,6 +2,7 @@ package shelly
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -17,6 +18,39 @@ type PowerConsumptionStatistics struct {
 	Interval string     `json:"interval"`
 	History  [][]*Entry `json:"history"`
 	Sum      []*Entry   `json:"sum"`
+}
+
+func (p *PowerConsumptionStatistics) Sort() {
+	sort.Slice(p.History[0], func(i, j int) bool {
+		return p.History[0][i].DateTime.Before(p.History[0][j].DateTime)
+	})
+	sort.Slice(p.History[1], func(i, j int) bool {
+		return p.History[1][i].DateTime.Before(p.History[1][j].DateTime)
+	})
+	sort.Slice(p.History[2], func(i, j int) bool {
+		return p.History[2][i].DateTime.Before(p.History[2][j].DateTime)
+	})
+	sort.Slice(p.Sum, func(i, j int) bool {
+		return p.Sum[i].DateTime.Before(p.Sum[j].DateTime)
+	})
+}
+
+func (p *PowerConsumptionStatistics) Add(stats *PowerConsumptionStatistics) error {
+	if p.Timezone != stats.Timezone {
+		return fmt.Errorf("timezone of this stats (%q) is different from the one to be added (%q)", p.Timezone, stats.Timezone)
+	}
+	if p.Interval != stats.Interval {
+		return fmt.Errorf("interval of this stats (%q) is different from the one to be added (%q)", p.Interval, stats.Interval)
+	}
+
+	p.History[0] = append(p.History[0], stats.History[0]...)
+	p.History[1] = append(p.History[1], stats.History[1]...)
+	p.History[2] = append(p.History[2], stats.History[2]...)
+	p.Sum = append(p.Sum, stats.Sum...)
+
+	p.Sort()
+
+	return nil
 }
 
 type Entry struct {
@@ -157,19 +191,7 @@ func NormalizePowerConsumptionStatistics(stats *PowerConsumptionStatistics, from
 		out.Sum = append(out.Sum, entries["total"])
 	}
 
-	// Finally sort all slices by date/time
-	sort.Slice(out.History[0], func(i, j int) bool {
-		return out.History[0][i].DateTime.Before(out.History[0][j].DateTime)
-	})
-	sort.Slice(out.History[1], func(i, j int) bool {
-		return out.History[1][i].DateTime.Before(out.History[1][j].DateTime)
-	})
-	sort.Slice(out.History[2], func(i, j int) bool {
-		return out.History[2][i].DateTime.Before(out.History[2][j].DateTime)
-	})
-	sort.Slice(out.Sum, func(i, j int) bool {
-		return out.Sum[i].DateTime.Before(out.Sum[j].DateTime)
-	})
+	out.Sort()
 
 	return out
 }

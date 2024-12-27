@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 	"time"
 )
@@ -15,10 +14,22 @@ const (
 )
 
 var (
-	supportedDeviceTypes = []string{
-		"em-3p",
+	SupportedDeviceTypes = map[string]*DeviceType{
+		"em-3p": {
+			PathSuffix: "em-3p",
+			Phases:     3,
+		},
+		"em-1": {
+			PathSuffix: "",
+			Phases:     1,
+		},
 	}
 )
+
+type DeviceType struct {
+	PathSuffix string
+	Phases     int
+}
 
 type ConfigDate time.Time
 
@@ -110,8 +121,8 @@ func Validate(config *Config) error {
 		if dev.ID == "" {
 			return fmt.Errorf("device ID needs to be set for device %d", i)
 		}
-		if !slices.Contains(supportedDeviceTypes, strings.ToLower(dev.Type)) {
-			return fmt.Errorf("device type %q is not supported: %s", dev.Type, supportedDeviceTypes)
+		if _, ok := SupportedDeviceTypes[strings.ToLower(dev.Type)]; !ok {
+			return fmt.Errorf("device type %q is not supported", dev.Type)
 		}
 		if dev.GoogleSheet != nil {
 			if dev.GoogleSheet.SheetID == "" && config.GoogleSheet != nil {

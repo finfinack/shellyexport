@@ -107,23 +107,15 @@ func (p *PowerConsumptionStatistics3p) Normalize(from, to time.Time) {
 	}
 
 	// Create the new structure and add the normalized data.
-	out := &PowerConsumptionStatistics3p{
-		Timezone: p.Timezone,
-		Interval: p.Interval,
-		History: [][]*Entry{
-			{},
-			{},
-			{},
-		},
-		Sum: []*Entry{},
-	}
+	history := [][]*Entry{{}, {}, {}}
+	sum := []*Entry{}
 	for _, entries := range normalized {
-		out.History[0] = append(out.History[0], entries["phaseA"])
-		out.History[1] = append(out.History[1], entries["phaseB"])
-		out.History[2] = append(out.History[2], entries["phaseC"])
-		out.Sum = append(out.Sum, entries["total"])
+		history[0] = append(history[0], entries["phaseA"])
+		history[1] = append(history[1], entries["phaseB"])
+		history[2] = append(history[2], entries["phaseC"])
+		sum = append(sum, entries["total"])
 	}
-
-	out.Sort()
-	p = out
+	p.History = history
+	p.Sum = sum
+	p.Sort()
 }

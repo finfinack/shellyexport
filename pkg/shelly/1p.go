@@ -59,14 +59,10 @@ func (p *PowerConsumptionStatistics1p) Normalize(from, to time.Time) {
 	}
 
 	// Create the new structure and add the normalized data.
-	out := &PowerConsumptionStatistics1p{
-		Timezone: p.Timezone,
-		Interval: p.Interval,
-		History:  []*Entry{},
-	}
+	history := []*Entry{}
 	for _, entry := range normalized {
-		out.History = append(out.History, entry)
+		history = append(history, entry)
 	}
-	out.Sort()
-	p = out
+	p.History = history
+	p.Sort()
 }

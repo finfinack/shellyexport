@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	urlPath     = "/v2/statistics/power-consumption"
+	baseURLPath = "/v2/statistics/power-consumption"
 	minInterval = 5 * 24 * time.Hour // 5 days
 )
 
@@ -33,7 +33,8 @@ func pullStatisticsForTimeframe(cfg *config.Config, dev *config.Device, from, to
 	if err != nil {
 		return nil, fmt.Errorf("invalid server specified in config (%q): %s\n", cfg.Server, err)
 	}
-	url = url.JoinPath(url.Path, urlPath, dev.Type)
+	devType := config.SupportedDeviceTypes[strings.ToLower(dev.Type)]
+	url = url.JoinPath(url.Path, baseURLPath, devType.PathSuffix)
 	q := url.Query()
 	q.Set("id", dev.ID)
 	q.Set("channel", "0")
@@ -67,23 +68,37 @@ func pullStatisticsForTimeframe(cfg *config.Config, dev *config.Device, from, to
 		return nil, fmt.Errorf("unable to read response body: %s\n", err)
 	}
 
-	stats := &shelly.PowerConsumptionStatistics{}
-	if err := json.Unmarshal(body, stats); err != nil {
-		return nil, fmt.Errorf("unable to parse body as JSON: %s", err)
+	switch devType.Phases {
+	case 1:
+		stats := &shelly.PowerConsumptionStatistics1p{}
+		if err := json.Unmarshal(body, stats); err != nil {
+			return nil, fmt.Errorf("unable to parse body as JSON: %s", err)
+		}
+		if stats.Interval != "day" {
+			return nil, fmt.Errorf("returned interval is not supported: %q\n", stats.Interval)
+		}
+		stats.Normalize(from, to)
+		return &shelly.PowerConsumptionStatistics{DeviceType: devType, Stats1p: stats}, nil
+	case 3:
+		stats := &shelly.PowerConsumptionStatistics3p{}
+		if err := json.Unmarshal(body, stats); err != nil {
+			return nil, fmt.Errorf("unable to parse body as JSON: %s", err)
+		}
+		if stats.Interval != "day" {
+			return nil, fmt.Errorf("returned interval is not supported: %q\n", stats.Interval)
+		}
+		stats.Normalize(from, to)
+		return &shelly.PowerConsumptionStatistics{DeviceType: devType, Stats3p: stats}, nil
+	default:
+		return nil, fmt.Errorf("unsupported amount of phases: %d", devType.Phases)
 	}
-
-	if stats.Interval != "day" {
-		return nil, fmt.Errorf("returned interval is not supported: %q\n", stats.Interval)
-	}
-
-	return shelly.NormalizePowerConsumptionStatistics(stats, from, to), nil
 }
 
 func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsumptionStatistics, error) {
 	var stats *shelly.PowerConsumptionStatistics
 
 	from := time.Time(cfg.Timeframe.From)
-	to := time.Time(cfg.Timeframe.From).AddDate(0, 1, 0)
+	to := time.Time(from).AddDate(0, 1, 0)
 	for {
 		if !to.Before(time.Time(cfg.Timeframe.To)) {
 			to = time.Time(cfg.Timeframe.To)
@@ -99,10 +114,22 @@ func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsum
 		if err != nil {
 			return nil, fmt.Errorf("unable to pull statistics from %q to %q: %s", from, to, err)
 		}
-		if stats == nil {
-			stats = statsFrame
-		} else {
-			stats.Add(statsFrame)
+
+		switch statsFrame.DeviceType.Phases {
+		case 1:
+			if stats == nil {
+				stats = statsFrame
+			} else {
+				stats.Stats1p.Add(statsFrame.Stats1p)
+			}
+		case 3:
+			if stats == nil {
+				stats = statsFrame
+			} else {
+				stats.Stats3p.Add(statsFrame.Stats3p)
+			}
+		default:
+			return nil, fmt.Errorf("unsupported amount of phases: %d", statsFrame.DeviceType.Phases)
 		}
 
 		if !to.Before(time.Time(cfg.Timeframe.To)) {
@@ -110,7 +137,7 @@ func pullStatistics(cfg *config.Config, dev *config.Device) (*shelly.PowerConsum
 		}
 
 		from = to
-		to = time.Time(cfg.Timeframe.From).AddDate(0, 1, 0)
+		to = time.Time(from).AddDate(0, 1, 0)
 	}
 
 	return stats, nil

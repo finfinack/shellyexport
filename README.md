@@ -1,5 +1,7 @@
 # ShellyExport
 
+Tool to read power consumption or production measured by Shelly devices from the Shelly cloud and exporting it as either a CSV or to a Google Sheet.
+
 ## Config
 
 ```json
@@ -53,3 +55,5 @@
   E.g. for https://docs.google.com/spreadsheets/d/1p-lTV5WPMKVi8VZ_GfGrRTwsfRjHyD6vUVSzpR7RRhA/edit?gid=0#gid=0, `1p-lTV5WPMKVi8VZ_GfGrRTwsfRjHyD6vUVSzpR7RRhA1` is the ID.
 
 * `sheet_id`: The ID of the sheet inside the Google Sheet, i.e. which tab to write to. The tab name should suffice.
+
+Note: Google Sheet configs can be made globally or locally for each device. At least the sheet ID has to be specific to a device though.

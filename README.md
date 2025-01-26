@@ -1,4 +1,4 @@
-# ShellyExport
+# shellyexport
 
 Tool to read power consumption or production measured by Shelly devices from the Shelly cloud and exporting it as either a CSV or to a Google Sheet.
 

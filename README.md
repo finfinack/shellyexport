@@ -57,3 +57,12 @@ Tool to read power consumption or production measured by Shelly devices from the
 * `sheet_id`: The ID of the sheet inside the Google Sheet, i.e. which tab to write to. The tab name should suffice.
 
 Note: Google Sheet configs can be made globally or locally for each device. At least the sheet ID has to be specific to a device though.
+
+## Run on k8s
+
+- Check Helm chart in `deploy` folder
+- Ensure a configmap `config` exists, containing a key `prod` which contains a config as described above.
+
+  ```bash
+  kubectl create configmap config --from-file=prod=./config.json
+  ```

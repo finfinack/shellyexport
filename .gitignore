@@ -2,9 +2,7 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=go,macos
 
 ### Custom ###
-
-vendor
-shellyExport
+/shellyExport
 config.json
 
 ### Go ###
@@ -25,7 +23,7 @@ config.json
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # Go workspace file
 go.work
@@ -38,7 +36,6 @@ go.work
 
 # Icon must end with two \r
 Icon
-
 
 # Thumbnails
 ._*

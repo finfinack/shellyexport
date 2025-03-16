@@ -20,7 +20,8 @@ image:
 imagePullSecrets: []
 
 cronjob:
-  schedule: "* */3 * * *"
+  # Run once a week on Sunday after midnight
+  schedule: "17 1 * * 0"
 
 config: /config/prod
 

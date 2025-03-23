@@ -67,7 +67,7 @@ autoscaling:
 volumes:
   - name: config
     configMap:
-      name: config
+      name: shelly-config
 
 volumeMounts:
   - name: config

@@ -61,8 +61,8 @@ Note: Google Sheet configs can be made globally or locally for each device. At l
 ## Run on k8s
 
 - Check Helm chart in `deploy` folder
-- Ensure a configmap `config` exists, containing a key `prod` which contains a config as described above.
+- Ensure a configmap `shelly-config` exists, containing a key `prod` which contains a config as described above.
 
   ```bash
-  kubectl create configmap config --from-file=prod=./config.json
+  kubectl create configmap shelly-config --from-file=prod=./config.json
   ```

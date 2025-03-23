@@ -20,7 +20,8 @@ image:
 imagePullSecrets: []
 
 cronjob:
-  schedule: "* */3 * * *"
+  # Run at 01:05 on Sunday: https://crontab.guru/#5_1_*_*_0
+  schedule: "5 1 * * 0"
 
 config: /config/prod
 
